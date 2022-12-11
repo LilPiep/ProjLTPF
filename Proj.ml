@@ -14,11 +14,11 @@ type e =
   | Negation of e;;  
 
 type i =
+  | Skip
   | Sequence of i * i
   | Affectation of v * e
   | While of e * i
   | If of e * i * i
-  | EpsilonI;;
 
 
 (** 1.1.2 **)
@@ -48,7 +48,7 @@ type i =
 
    Instructions :
 
-   S ::= I;S | epsilon (axiome)
+   S ::= I;S | epsilon
    I ::= 
    | V:=E 
    | i(E){S}{S} 
@@ -57,17 +57,22 @@ type i =
    
  *)
 
-(* Nouveau type i *)
+(** 1.2.1 **)
+(*
+                      P
+[expr]S1 =true    S1 ---->S2
+----------------------------
+  if expr then P else Q  
+S1 ---------------------->S2
 
-type s =
-  | Axiome of i * s
-  | EpsilonS
-and
-  i =
-  | Affectation of v * e
-  | While of e * s
-  | If of e * s * s
-  | EpsilonI;;
+*****************************************
+
+                       Q
+[expr]S1 =false    S1 ---->S3
+----------------------------
+  if expr then P else Q  
+S1 ----------------------->S3
+ *)
 
 
 (*EXO 2.1*)
