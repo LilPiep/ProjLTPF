@@ -153,14 +153,14 @@ let rec eval (s:state) (exp:e) : b =
   match exp with
   | Variable v -> get s v
   | Boolean b -> b
-  | Conjonction (e1, e2) -> 
+  | Conjonction (b1, b2) -> 
   match b1 with
     |Zero -> Zero
     |Un -> 
     match b2 with
           |Zero -> Zero
           |Un -> Un
-  | Disjonction (e1, e2) -> 
+  | Disjonction (b1, b2) -> 
   match b1 with
     |Un -> Un
     |Zero -> 
