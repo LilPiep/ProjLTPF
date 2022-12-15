@@ -97,7 +97,7 @@ let terminal (c : 'term) : 'term analist = function
   | x :: l when x = c -> l
   | _ -> raise Echec
 
-let terminal_cond (p : 'term -> boool) : 'term analist = function
+let terminal_cond (p : 'term -> bool) : 'term analist = function
   | x :: l when (p x = Z) -> l
   | _ -> raise Echec
 
