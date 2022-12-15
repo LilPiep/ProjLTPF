@@ -85,9 +85,13 @@ let list_of_string s =
   in boucle 0;;
 
 
-type analist = char list -> char list
-type ('r, 'term) ranalist = 'term list -> 'r * 'term list;;
+type 'term analist = 'term list -> 'term list
+type ('r, 'term) ranalist = 'term list -> 'r * 'term list
 exception Echec
+
+(* Combinateurs d'analyseurs purs *)
+
+(* partie utile pour les analist*)
 
 let terminal c : analist = fun l -> match l with
   | x :: l when x = c -> l
@@ -104,6 +108,11 @@ let ( -->) (a : analist) (b : analist) : analist =
 
 let (-|) (a1 : analist) (a2 : analist) : analist =
   fun l -> try a1 l with Echec -> a2 l
+
+let rec star (a : 'term analist) : 'term analist = fun l -> l |>
+  ( a --> star a ) -| epsilon
+
+(*partie utile pour les ranaliste *)
 
 let epsilon_res (info : 'res) : ('res, 'term) ranalist =
   fun l -> (info, l)
@@ -125,14 +134,47 @@ let (+->) (a : ('res, 'term) ranalist) (b : analist) : analist =
 let (++>) (a : ('resa, 'term) ranalist) (b : 'resa -> ('resb, 'term) ranalist) : ('resb, 'term) ranalist =
   fun l -> let (x, l) = a l in b x l
 
-let pa_C = (terminal '1' -| terminal '0');;
+(*les deux parties seront traitées séparément*)
 
-let pa_V = (terminal 'a' -| terminal 'b' -| terminal 'c' -| terminal 'd');;
+(* partie 2.1.1 *)
 
-let pa_CV = (pa_C -| pa_V);;
+(*commençons avec les analist *)
 
-let pa_A = (pa_V --> terminal ':' --> terminal '=' --> pa_CV);;
+let pa_C = (terminal '1' -| terminal '0')
 
+let pa_V = (terminal 'a' -| terminal 'b' -| terminal 'c' -| terminal 'd')
+
+let pa_CV = (pa_C -| pa_V)
+
+let rec pa_Seq : 'term analist = fun l ->  l |>
+  ( ( pa_A -| pa_I -| pa_W )--> ((terminal ';' --> pa_Seq ) -| epsilon ))
+  and pa_A : 'term analist = fun l -> l |>
+           (pa_V --> terminal ':' --> terminal '=' --> pa_CV)
+  and pa_I : 'term analist = fun l -> l |>
+           ( terminal 'i' --> terminal '(' --> pa_CV --> terminal ')' --> terminal '{' --> pa_Seq --> terminal '}' --> terminal '{' --> pa_Seq --> terminal '}' )
+  and pa_W : 'term analist = fun l -> l |>
+           ( terminal 'w' --> terminal '(' --> pa_CV --> terminal ')' --> terminal '{' --> p_Seq --> terminal '}' )
+  
+let _=pa_Seq (list_of_string "a:=1;b:=1;c:=1;w(a){i(c){c:=0;a:=b}{b:=0;c:=a}}")
+  
+(* version ranalist maintenant *)
+
+let pa_V2 = (terminal 'a' -+> epsilon_res 'a' -| terminal 'b' -+> epsilon_res 'b' -| terminal 'c' -+> epsilon_res 'c' -| terminal 'd' -+> epsilon_res 'd')
+
+let pa_C2 = (terminal '1' -+> epsilon_res (True) -| terminal '0' -+> epsilon_res (False))
+
+let pa_C2V2 = (pa_C2 -| pa_V2)
+
+let rec pa_Seq2: i ranalist = fun l ->  l |>
+    (pa_A2 +| pa_W2 +| pa_I2) ++> fun a -> ((terminal ';' -+> pa_Seq2 ++> fun suite -> epsilon_res (Seq(i,reste))) +| epsilon_res (Seq(a,Skip)))
+    and pa_A2 : i ranalist = fun l -> l |>
+              pa_V2 ++> fun v -> terminal ':' --> terminal '=' -+> pa_C2V2 ++> fun a -> epsilon_res (Assign(v,a));; 
+    and pa_I2 : i ranalist = fun l ->  l |>
+              terminal 'i' --> terminal '(' -+> pa_C2V2 ++> fun cond -> terminal ')' --> terminal '{' -+> pa_Seq2 ++> fun the -> terminal '}' --> terminal '{' -+> pa_Seq2 ++> fun els -> terminal '}' -+> epsilon_res(If(cond,the,els))
+    and pa_W2: i ranalist = fun l ->  l |>
+              terminal 'w' --> terminal '(' -+> pa_C2V2 ++> fun cond -> terminal ')' --> terminal '{' -+> pa_Seq2 ++> fun the -> terminal '}' -+> epsilon_res(While(cond,the))
+
+pa_Seq2 (list_of_string "a:=1;b:=1;c:=1;w(1){i(1){c:=0;a:=1}{b:=0;c:=1}}");;
 (* EXO 2.2 *)
 
 
