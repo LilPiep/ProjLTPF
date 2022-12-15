@@ -93,21 +93,21 @@ exception Echec
 
 (* partie utile pour les analist*)
 
-let terminal c : analist = fun l -> match l with
+let terminal (c : 'term) : 'term analist = function
   | x :: l when x = c -> l
   | _ -> raise Echec
 
-let terminal_cond (p : char -> bool) : analist = fun l -> match l with
-  | x :: l when p x -> l
+let terminal_cond (p : 'term -> boool) : 'term analist = function
+  | x :: l when (p x = Z) -> l
   | _ -> raise Echec
 
-let epsilon : analist = fun l -> l
-
-let ( -->) (a : analist) (b : analist) : analist =
+let epsilon : 'term analist = fun l -> l
+  
+let (-->) (a : 'term analist) (b : 'term analist) : 'term analist =
   fun l -> let l = a l in b l
 
-let (-|) (a1 : analist) (a2 : analist) : analist =
-  fun l -> try a1 l with Echec -> a2 l
+let (-|) (a : 'term analist) (b : 'term analist) : 'term analist =
+  fun l -> try a l with Echec -> b l
 
 let rec star (a : 'term analist) : 'term analist = fun l -> l |>
   ( a --> star a ) -| epsilon
