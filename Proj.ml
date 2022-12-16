@@ -1,3 +1,4 @@
+
 (** Projet LTPF **)
 
 (** 1.1.1 **)
@@ -24,12 +25,10 @@ type i =
 (** 1.1.2 **)
 
 (* Grammaire
-
    Variables :
    V ::= a | b | c | d (variable)
    B ::= 0 | 1 (booléen)
    E ::= V | B (expression)        
-
    Instructions :
    I ::=
      | I;I
@@ -43,11 +42,8 @@ type i =
 (** 1.1.3 **)
 
 (* Nouvelle grammaire
-
    Variables similaires        
-
    Instructions :
-
    S ::= I;S | epsilon
    I ::= 
    | V:=E 
@@ -64,9 +60,7 @@ type i =
 ----------------------------
   if expr then P else Q  
 S1 ---------------------->S2
-
 *****************************************
-
                        Q
 [expr]S1 =false    S1 ---->S3
 ----------------------------
@@ -97,8 +91,8 @@ let terminal (c : 'term) : 'term analist = function
   | x :: l when x = c -> l
   | _ -> raise Echec
 
-let terminal_cond (p : 'term -> bool) : 'term analist = function
-  | x :: l when (p x = Z) -> l
+let terminal_cond (p : 'term -> b) : 'term analist = function
+  | x :: l when (p x = Zero) -> l
   | _ -> raise Echec
 
 let epsilon : 'term analist = fun l -> l
@@ -125,19 +119,18 @@ let terminal_res (f : 'term -> 'res option) : ('res, 'term) ranalist =
 let (+|) (a : ('res, 'term) ranalist) (b : ('res, 'term) ranalist) : ('res, 'term) ranalist =
   fun l -> try a l with Echec -> b l
 
-let ( -+>) (a : analist) (b : ('res, 'term) ranalist) : ('res, 'term) ranalist =
+let ( -+>) (a :'term analist) (b : ('res, 'term) ranalist) : ('res, 'term) ranalist =
   fun l -> let l = a l in b l
 
-let (+->) (a : ('res, 'term) ranalist) (b : analist) : analist =
+let (+->) (a : ('res, 'term) ranalist) (b : 'term analist) : 'term analist =
   fun l -> let (x, l) = a l in b l
 
 let (++>) (a : ('resa, 'term) ranalist) (b : 'resa -> ('resb, 'term) ranalist) : ('resb, 'term) ranalist =
   fun l -> let (x, l) = a l in b x l
-
 (*les deux parties seront traitées séparément*)
 
 (* partie 2.1.1 *)
-
+(* 2.1.2 -> une ou deux fonction test sont écrites à chaque partie leurs résultat après exécution est à chaque fois cohérent *)
 (*commençons avec les analist *)
 
 let pa_C = (terminal '1' -| terminal '0')
@@ -153,61 +146,126 @@ let rec pa_Seq : 'term analist = fun l ->  l |>
   and pa_I : 'term analist = fun l -> l |>
            ( terminal 'i' --> terminal '(' --> pa_CV --> terminal ')' --> terminal '{' --> pa_Seq --> terminal '}' --> terminal '{' --> pa_Seq --> terminal '}' )
   and pa_W : 'term analist = fun l -> l |>
-           ( terminal 'w' --> terminal '(' --> pa_CV --> terminal ')' --> terminal '{' --> p_Seq --> terminal '}' )
+           ( terminal 'w' --> terminal '(' --> pa_CV --> terminal ')' --> terminal '{' --> pa_Seq --> terminal '}' )
   
-let _=pa_Seq (list_of_string "a:=1;b:=1;c:=1;w(a){i(c){c:=0;a:=b}{b:=0;c:=a}}")
+let _=pa_Seq (list_of_string "a:=b;b:=c;c:=0;w(1){i(1){c:=0;a:=1}{b:=0;c:=1}}");;
   
 (* version ranalist maintenant *)
 
-let pa_V2 = (terminal 'a' -+> epsilon_res 'a' -| terminal 'b' -+> epsilon_res 'b' -| terminal 'c' -+> epsilon_res 'c' -| terminal 'd' -+> epsilon_res 'd')
+let pr_V = (terminal 'a' -+> epsilon_res A) +| (terminal 'b' -+> epsilon_res B) +|(terminal 'c' -+> epsilon_res C) +| (terminal 'd' -+> epsilon_res D)
 
-let pa_C2 = (terminal '1' -+> epsilon_res (True) -| terminal '0' -+> epsilon_res (False))
+let pr_C = (terminal '1' -+> epsilon_res (Un)) +| (terminal '0' -+> epsilon_res (Zero))
 
-let pa_C2V2 = (pa_C2 -| pa_V2)
+let pr_CV: (e, char) ranalist = fun l -> l |> (pr_C ++> fun a -> epsilon_res (Booleen a)) +| (pr_V ++> fun b -> epsilon_res (Variable b))
 
-let rec pa_Seq2: i ranalist = fun l ->  l |>
-    (pa_A2 +| pa_W2 +| pa_I2) ++> fun a -> ((terminal ';' -+> pa_Seq2 ++> fun suite -> epsilon_res (Seq(i,reste))) +| epsilon_res (Seq(a,Skip)))
-    and pa_A2 : i ranalist = fun l -> l |>
-              pa_V2 ++> fun v -> terminal ':' --> terminal '=' -+> pa_C2V2 ++> fun a -> epsilon_res (Assign(v,a));; 
-    and pa_I2 : i ranalist = fun l ->  l |>
-              terminal 'i' --> terminal '(' -+> pa_C2V2 ++> fun cond -> terminal ')' --> terminal '{' -+> pa_Seq2 ++> fun the -> terminal '}' --> terminal '{' -+> pa_Seq2 ++> fun els -> terminal '}' -+> epsilon_res(If(cond,the,els))
-    and pa_W2: i ranalist = fun l ->  l |>
-              terminal 'w' --> terminal '(' -+> pa_C2V2 ++> fun cond -> terminal ')' --> terminal '{' -+> pa_Seq2 ++> fun the -> terminal '}' -+> epsilon_res(While(cond,the))
+let pr_A : ('res, 'term) ranalist = fun l -> l |>
+              pr_V ++> fun v -> terminal ':' --> terminal '=' -+> pr_CV ++> fun a -> epsilon_res (Affectation(v,a))
 
-pa_Seq2 (list_of_string "a:=1;b:=1;c:=1;w(1){i(1){c:=0;a:=1}{b:=0;c:=1}}");;
+let rec pr_I :  ('res, 'term) ranalist = fun l ->  l |>
+              terminal 'i' --> terminal '(' -+> pr_CV ++> fun cond -> terminal ')' --> terminal '{' -+> pr_Seq ++> fun the -> terminal '}' --> terminal '{' -+> pr_Seq ++> fun els -> terminal '}' -+> epsilon_res(If(cond,the,els))
+    and pr_W:('res, 'term) ranalist = fun l ->  l |>
+              terminal 'w' --> terminal '(' -+> pr_CV ++> fun cond -> terminal ')' --> terminal '{' -+> pr_Seq ++> fun the -> terminal '}' -+> epsilon_res(While(cond,the))
+    and pr_Seq:('res, 'term) ranalist = fun l ->  l |>
+    (pr_A +| pr_W +| pr_I) ++> fun a -> ((terminal ';' -+> pr_Seq ++> fun suite -> epsilon_res (Sequence(a,suite))) +| epsilon_res (Sequence(a,Skip)));;
+
+      
+
+let _=pr_Seq (list_of_string "a:=b;b:=c;c:=0;w(1){i(1){c:=0;a:=1}{b:=0;c:=1}}");;
+
+(* 2.1.3 analist *)
+
+let rec star (a : 'term analist) : 'term analist = fun l -> l |>
+  ( a --> star a ) -| epsilon
+
+(*let pa_E = star (terminal ' ' -| terminal ('/n'))
+
+let pa_N = (pa_E -| epsilon)
+           *)
+
+let rec pa_Ope : 'term analist = fun l -> l |>
+           ((terminal '!' --> pa_Ope) -|(pa_CV)-| (terminal '+' --> pa_Ope) -|(terminal '(' --> pa_plus --> terminal ')')-| (terminal '.' --> pa_Ope )) --> (pa_Ope  -| epsilon )
+and pa_point : 'term analist = fun l -> l |>
+           (((pa_Ope --> terminal '.' --> pa_Ope) -| pa_Ope )--> (pa_Ope  -| epsilon ))
+and pa_plus : 'term analist = fun l -> l |>
+           (((pa_Ope --> terminal '+' --> pa_Ope) -| pa_Ope)--> (pa_Ope  -| epsilon )) 
+
+
+
+
+let rec pa_Seq2 : 'term analist = fun l ->  l |>
+  (( pa_A2 -| pa_I2 -| pa_W2 -| pa_Ope)--> ((terminal ';' --> pa_Seq2 ) -| epsilon ))
+  and pa_A2 : 'term analist = fun l -> l |>
+           (pa_V --> terminal ':' --> terminal '=' --> pa_Ope)
+  and pa_I2 : 'term analist = fun l -> l |>
+           ( terminal 'i' --> terminal '(' --> pa_Ope --> terminal ')' --> terminal '{' --> pa_Seq2 --> terminal '}' --> terminal '{' --> pa_Seq2 --> terminal '}' )
+  and pa_W2 : 'term analist = fun l -> l |>
+           ( terminal 'w' --> terminal '(' --> pa_Ope --> terminal ')' --> terminal '{' --> pa_Seq2 --> terminal '}' );;
+
+let _=pa_Seq2 (list_of_string "c:=a.b");;
+let _=pa_Seq2 (list_of_string "a:=b;b:=c;c:=0;w(1){i(1){c:=0;a:=1}{b:=0;c:=1}}");;
+let _=pa_Seq2 (list_of_string "(!1)")
+
+(* 2.1.3 ranalist*)
+
+let rec (pr_Ope: (e, char) ranalist) = fun l -> l |> 
+(terminal '!' -+> pr_Ope ++> fun a -> epsilon_res (Negation a)) +| 
+(pr_CV ++> fun a -> epsilon_res a) +| 
+(terminal '(' -+> pr_Ope ++> fun b -> terminal ')' -+> epsilon_res b )
+and pr_point (exp : e) : (e, char) ranalist = fun l -> l |> 
+(terminal '.' -+> pr_Ope ++> fun a -> pr_point (Conjonction (exp,a))) +| epsilon_res exp
+and pr_plus (exp : e) : (e, char) ranalist = fun l -> l |> 
+(terminal '+' -+> pr_Ope ++> fun a -> pr_plus (Disjonction (exp,a))) +| epsilon_res exp
+
+
+let _=pr_Ope (list_of_string "c:=a.b");;
+let _=pr_Ope (list_of_string "(!1)");;
+
 (* EXO 2.2 *)
 
 
-type state = (var*int) list;;
+type state = 
+  | Nil
+  | Cons of state * v * b;; 
 
-let rec (get : var -> state -> int) = fun c s ->
+let rec (get : v -> state -> b) = fun c s ->
   match s with
-  |(var,value) :: suite -> if var=c then value else get c suite
-  |[] -> raise Echec;;
+  |Nil -> Zero
+  |Cons(s2, var, va) -> if c==var then va else get c s2;;
 
- let rec (update: state -> int -> var -> state) = fun s i v ->
-   match s with
-   | [] -> (v,i) :: []
-   | (var,value) :: suite -> if var=v then (v,i)::suite else (var,value)::(update suite i v)
- ;;
-  
+let rec update ...
+
+
+let rec conj (b1:b) (b2:b) : b = 
+  match b1 with
+  |Zero -> Zero
+  |Un -> match b2 with
+          |Zero -> Zero
+          |Un -> Un
+;;
+
+let rec disj (b1:b) (b2:b) : b = 
+  match b1 with
+  |Un -> Un
+  |Zero -> match b2 with
+            |Zero -> Zero
+            |Un -> Un
+;;
+
+let rec non (b1:b) : b = if b1=Un then Zero else Un
+;;
+
 let rec eval (s:state) (exp:e) : b = 
   match exp with
   | Variable v -> get s v
   | Boolean b -> b
-  | Conjonction (b1, b2) -> 
-  match b1 with
-    |Zero -> Zero
-    |Un -> 
-    match b2 with
-          |Zero -> Zero
-          |Un -> Un
-  | Disjonction (b1, b2) -> 
-  match b1 with
-    |Un -> Un
-    |Zero -> 
-    match b2 with
-          |Zero -> Zero
-          |Un -> Un
-  | Negation e -> b = if b1=Un then Zero else Un
+  | Conjonction (e1, e2) -> conj (eval s e1) (eval s e2)
+  | Disjonction (e1, e2) -> disj (eval s e1) (eval s e2)
+  | Negation e -> non (eval s e)
 ;;
+
+let rec sn (s:state) (ast:i) : state = match ast with
+  | Skip -> s
+  | Seq(i1, i2) -> sn (sn s i1) i2
+  | Assign(v,e) -> update s v e
+  | While(e,i1) -> if (eval s e)=Un then sn s i1 else s
+  | If(e,i1,i2) -> if (eval s e)=Un then sn s i1 else sn s i2;;
